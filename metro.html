@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xem tạm tuyến Metro TP.HCM – Bình Dương (ước lượng)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@9.2.4/ol.css" />
+  <style>
+    html, body { margin: 0; height: 100%; font-family: "Segoe UI", Roboto, sans-serif; }
+    #map { position: absolute; inset: 0; }
+    #info {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      background: rgba(255,255,255,0.95); border: 1px solid #cfe0d9;
+      border-radius: 10px; padding: 12px 14px; max-width: 320px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15); font-size: 13px; line-height: 1.5;
+    }
+    #info h1 { font-size: 15px; margin: 0 0 6px; }
+    #info .l1 { color: #e11d74; font-weight: 700; }
+    #info .l2 { color: #1d4ed8; font-weight: 700; }
+    #info .warn { color: #a05a00; font-size: 12px; margin-top: 8px; }
+    #info .dl { margin-top: 8px; }
+    #info a { color: #1fbf75; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info">
+    <h1>🚇 Tuyến Metro TP.HCM – Bình Dương</h1>
+    <div><span class="l1">●</span> Tuyến 1 kéo dài (Suối Tiên – TP mới Bình Dương)</div>
+    <div><span class="l2">●</span> Trục QL13 (Tao Đàn – Thủ Dầu Một)</div>
+    <div class="warn">⚠ Tọa độ ƯỚC LƯỢNG do AI đưa ra, chỉ để xem tham khảo — không phải mốc quy hoạch chính thức.</div>
+    <div class="dl"><a href="#" id="export">⬇ Tải GeoJSON</a></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ol@9.2.4/dist/ol.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    // Dữ liệu các ga: [lon, lat, tên]. (Gemini đưa dạng Vĩ độ, Kinh độ -> ở đây đảo thành [lon,lat].)
+    var line1 = {
+      name: 'Tuyến 1 kéo dài: Suối Tiên – TP mới Bình Dương',
+      color: '#e11d74',
+      stops: [
+        [106.8152, 10.8789, 'Ga Bến xe Suối Tiên'],
+        [106.8280, 10.8935, 'Ga S0 (Nút giao Tân Vạn)'],
+        [106.7725, 10.9061, 'Ga Dĩ An'],
+        [106.7241, 10.9458, 'Ga An Phú (Thuận An)'],
+        [106.6662, 11.0545, 'Ga Trung tâm TP mới Bình Dương']
+      ]
+    };
+    var line2 = {
+      name: 'Trục QL13: Tao Đàn – Thủ Dầu Một',
+      color: '#1d4ed8',
+      stops: [
+        [106.6917, 10.7742, 'Ga Tao Đàn (Quận 1)'],
+        [106.7118, 10.8016, 'Ga Ngã tư Hàng Xanh'],
+        [106.7082, 10.8640, 'Depot Hiệp Bình Phước'],
+        [106.7020, 10.8785, 'Cổng Chào Bình Dương (Vĩnh Phú)'],
+        [106.6713, 10.9732, 'Suối Cát / Ngã tư Địa Chất (Thủ Dầu Một)']
+      ]
+    };
+
+    var source = new ol.source.Vector();
+
+    function buildLine(def) {
+      var coords = def.stops.map(function (s) { return ol.proj.fromLonLat([s[0], s[1]]); });
+      // Đường nối các ga
+      var lineFeat = new ol.Feature({
+        geometry: new ol.geom.LineString(coords),
+        name: def.name,
+        kind: 'line',
+        color: def.color
+      });
+      source.addFeature(lineFeat);
+      // Ghim từng ga
+      def.stops.forEach(function (s, i) {
+        var f = new ol.Feature({
+          geometry: new ol.geom.Point(ol.proj.fromLonLat([s[0], s[1]])),
+          name: (i + 1) + '. ' + s[2],
+          kind: 'stop',
+          color: def.color
+        });
+        source.addFeature(f);
+      });
+    }
+    buildLine(line1);
+    buildLine(line2);
+
+    function styleFn(feature) {
+      var kind = feature.get('kind');
+      var color = feature.get('color') || '#1fbf75';
+      if (kind === 'line') {
+        return [
+          new ol.style.Style({ stroke: new ol.style.Stroke({ color: 'rgba(255,255,255,0.9)', width: 7 }) }),
+          new ol.style.Style({ stroke: new ol.style.Stroke({ color: color, width: 4 }) })
+        ];
+      }
+      // ga
+      return new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 6,
+          fill: new ol.style.Fill({ color: '#ffffff' }),
+          stroke: new ol.style.Stroke({ color: color, width: 3 })
+        }),
+        text: new ol.style.Text({
+          text: feature.get('name'),
+          offsetY: -16,
+          font: '12px "Segoe UI", sans-serif',
+          fill: new ol.style.Fill({ color: '#1b332c' }),
+          stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 }),
+          overflow: true
+        })
+      });
+    }
+
+    var vector = new ol.layer.Vector({ source: source, style: styleFn });
+
+    var map = new ol.Map({
+      target: 'map',
+      layers: [
+        new ol.layer.Tile({
+          source: new ol.source.OSM({ url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png' })
+        }),
+        vector
+      ],
+      view: new ol.View({ center: ol.proj.fromLonLat([106.75, 10.92]), zoom: 11 })
+    });
+
+    // Phóng vừa khít toàn bộ 2 tuyến
+    map.getView().fit(source.getExtent(), { padding: [60, 60, 60, 60], maxZoom: 15 });
+
+    // Xuất GeoJSON để bạn có thể dùng chỗ khác nếu cần
+    document.getElementById('export').addEventListener('click', function (e) {
+      e.preventDefault();
+      var fmt = new ol.format.GeoJSON();
+      var fc = fmt.writeFeaturesObject(source.getFeatures(), {
+        dataProjection: 'EPSG:4326', featureProjection: 'EPSG:3857'
+      });
+      var blob = new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'metro-hcm-binhduong.geojson'; a.click();
+      URL.revokeObjectURL(url);
+    });
+  })();
+  </script>
+</body>
+</html>

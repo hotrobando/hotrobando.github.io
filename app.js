@@ -258,6 +258,9 @@
   var POLY_COLOR = '#1d4ed8';    // xanh dương đậm cho vùng/hình
   var CASING = 'rgba(255,255,255,0.9)'; // viền trắng tách khỏi nền
 
+  // Bật khi người dùng vào chế độ "đặt tên điểm": hiện chấm ở mọi vertex của line.
+  var pointNameMode = false;
+
   // Đo độ dài của một đoạn [a,b] (tọa độ 3857) theo mét trên mặt cầu.
   function segmentLength(a3857, b3857) {
     return ol.sphere.getLength(new ol.geom.LineString([a3857, b3857]));
@@ -291,8 +294,30 @@
       styles.push(new ol.style.Style({
         stroke: new ol.style.Stroke({ color: LINE_COLOR, width: 3 })
       }));
-      if (name) {
-        var cs = geom.getCoordinates();
+      var cs = geom.getCoordinates();
+      var pNames = feature.get('pointNames') || [];
+      // Chấm + nhãn cho từng điểm:
+      //  - luôn hiện chấm nhỏ ở điểm ĐÃ CÓ tên;
+      //  - khi bật chế độ đặt tên điểm thì hiện chấm ở MỌI điểm để dễ bấm.
+      for (var p = 0; p < cs.length; p++) {
+        var pn = (pNames[p] || '').trim();
+        var hasName = !!pn;
+        if (hasName || pointNameMode) {
+          styles.push(new ol.style.Style({
+            geometry: new ol.geom.Point(cs[p]),
+            image: new ol.style.Circle({
+              radius: hasName ? 5 : 4,
+              fill: new ol.style.Fill({ color: hasName ? LINE_COLOR : '#ffffff' }),
+              stroke: new ol.style.Stroke({ color: hasName ? '#ffffff' : LINE_COLOR, width: 2 })
+            })
+          }));
+        }
+        if (hasName) {
+          styles.push(nameLabel(pn, cs[p], LINE_COLOR));
+        }
+      }
+      // Nhãn tên đường: chỉ hiện khi KHÔNG có nhãn điểm nào (tránh chồng chữ).
+      if (name && !pNames.some(function (x) { return x && x.trim(); })) {
         styles.push(nameLabel(name, cs[Math.floor(cs.length / 2)], LINE_COLOR));
       }
       return styles;
@@ -430,7 +455,7 @@
   }
 
   map.on('pointermove', function (evt) {
-    if (evt.dragging || drawInteraction) { // đang kéo bản đồ hoặc đang vẽ -> ẩn
+    if (evt.dragging || drawInteraction || pointNameMode || modifyInteraction) { // đang kéo/vẽ/đặt tên/chỉnh điểm -> ẩn tooltip đo
       clearHover();
       return;
     }
@@ -768,6 +793,8 @@
 
   function startDrawing(type) {
     stopDrawing();
+    if (pointNameMode) setPointNameMode(false); // không để 2 chế độ cùng bật
+    setEditPointMode(false);                    // tắt chế độ kéo chỉnh nếu đang bật
     activeDrawType = type;
 
     var options = { source: vectorSource };
@@ -821,7 +848,128 @@
   makeDrawToggle('rectangle', drawButtons.rectangle);
   makeDrawToggle('line', drawButtons.line);
 
-  document.getElementById('draw-cancel').addEventListener('click', stopDrawing);
+  document.getElementById('draw-cancel').addEventListener('click', function () {
+    stopDrawing();
+    setPointNameMode(false);
+    setEditPointMode(false);
+  });
+
+  /* ---- Chế độ ĐẶT TÊN ĐIỂM của đường ---- */
+  var nameModeBtn = document.getElementById('name-points');
+
+  function setPointNameMode(on) {
+    if (on) setEditPointMode(false); // loại trừ với chế độ kéo chỉnh
+    pointNameMode = on;
+    if (nameModeBtn) nameModeBtn.classList.toggle('active', on);
+    map.getTargetElement().style.cursor = on ? 'crosshair' : '';
+    // ép vẽ lại để hiện/ẩn chấm vertex
+    vectorSource.changed();
+    if (on) {
+      hideDrawHint();
+      drawHint.textContent = '🏷️ Chạm vào một điểm trên ĐƯỜNG để đặt tên cho điểm đó. Bấm lại nút để tắt.';
+      drawHint.hidden = false;
+    } else {
+      hideDrawHint();
+    }
+  }
+
+  // Tìm vertex (điểm) của một LineString gần tọa độ nhất, trả về {feature, index, distSq}.
+  function nearestVertexOnLines(coord) {
+    var best = null;
+    vectorSource.getFeatures().forEach(function (f) {
+      var g = f.getGeometry();
+      if (!g || g.getType() !== 'LineString') return;
+      var verts = g.getCoordinates();
+      for (var i = 0; i < verts.length; i++) {
+        var dx = coord[0] - verts[i][0], dy = coord[1] - verts[i][1];
+        var d = dx * dx + dy * dy;
+        if (!best || d < best.distSq) best = { feature: f, index: i, distSq: d };
+      }
+    });
+    return best;
+  }
+
+  if (nameModeBtn) {
+    nameModeBtn.addEventListener('click', function () {
+      if (pointNameMode) {
+        setPointNameMode(false);
+      } else {
+        stopDrawing();           // tắt vẽ nếu đang vẽ
+        setPointNameMode(true);
+      }
+    });
+  }
+
+  // Click lên bản đồ khi đang ở chế độ đặt tên điểm.
+  map.on('singleclick', function (evt) {
+    if (!pointNameMode) return;
+    var hit = nearestVertexOnLines(evt.coordinate);
+    if (!hit) {
+      toast('Chưa có đường nào để đặt tên điểm. Hãy vẽ/nhập một đường trước.', true);
+      return;
+    }
+    // chỉ nhận khi bấm đủ gần điểm (trong ~20px theo độ phân giải hiện tại)
+    var res = map.getView().getResolution();
+    var maxDist = 20 * res; // 20 pixel
+    if (Math.sqrt(hit.distSq) > maxDist) {
+      toast('Hãy chạm gần một điểm (đỉnh) của đường hơn.', true);
+      return;
+    }
+    var f = hit.feature;
+    var names = (f.get('pointNames') || []).slice();
+    var current = names[hit.index] || '';
+    var input = prompt('Tên cho điểm thứ ' + (hit.index + 1) + ':', current);
+    if (input === null) return; // hủy
+    names[hit.index] = input.trim();
+    f.set('pointNames', names);
+    f.changed();
+    persistAll();
+    toast(input.trim() ? 'Đã đặt tên điểm.' : 'Đã xóa tên điểm.');
+  });
+
+  /* ---- Chế độ KÉO CHỈNH ĐIỂM (ol.interaction.Modify) ---- */
+  var editPointBtn = document.getElementById('edit-points');
+  var modifyInteraction = null;
+
+  function setEditPointMode(on) {
+    if (on) {
+      if (modifyInteraction) return;
+      modifyInteraction = new ol.interaction.Modify({
+        source: vectorSource,
+        // Chỉ kéo các đỉnh CÓ SẴN, không chèn đỉnh mới -> số điểm cố định,
+        // nên tên điểm (pointNames) không bị lệch chỉ số.
+        insertVertexCondition: ol.events.condition.never
+      });
+      modifyInteraction.on('modifyend', function () {
+        persistAll();
+      });
+      map.addInteraction(modifyInteraction);
+      if (editPointBtn) editPointBtn.classList.add('active');
+      map.getTargetElement().style.cursor = '';
+      hideDrawHint();
+      drawHint.textContent = '✥ Kéo các đỉnh của đường/hình để chỉnh vị trí. Bấm lại nút để tắt.';
+      drawHint.hidden = false;
+    } else {
+      if (modifyInteraction) {
+        map.removeInteraction(modifyInteraction);
+        modifyInteraction = null;
+      }
+      if (editPointBtn) editPointBtn.classList.remove('active');
+      hideDrawHint();
+    }
+  }
+
+  if (editPointBtn) {
+    editPointBtn.addEventListener('click', function () {
+      if (modifyInteraction) {
+        setEditPointMode(false);
+      } else {
+        stopDrawing();
+        setPointNameMode(false);
+        setEditPointMode(true);
+      }
+    });
+  }
 
   // Nút bung/thu nhóm công cụ vẽ (chủ yếu cho mobile, nơi nhóm bị ẩn).
   var toolbarEl = document.getElementById('draw-toolbar');
@@ -1344,7 +1492,9 @@
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!helpModal.hidden) { closeHelp(); return; }
-    if (drawInteraction) { stopDrawing(); toast('Đã hủy vẽ.'); }
+    if (drawInteraction) { stopDrawing(); toast('Đã hủy vẽ.'); return; }
+    if (pointNameMode) { setPointNameMode(false); toast('Đã tắt đặt tên điểm.'); return; }
+    if (modifyInteraction) { setEditPointMode(false); toast('Đã tắt kéo chỉnh điểm.'); return; }
   });
 
   /* ------------------------------------------------------------------ *

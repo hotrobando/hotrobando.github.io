@@ -31,6 +31,13 @@ Chạy hoàn toàn phía client, không cần server, deploy thẳng lên **GitH
     **từng cạnh**.
   - Trên bản đồ chỉ hiển thị tên thửa (gọn), với màu nổi bật và viền trắng để dễ
     nhìn trên cả nền Đơn giản lẫn Vệ tinh.
+- **Đặt tên từng điểm của đường**: bấm nút 🏷️ trên thanh công cụ để bật chế độ,
+  khi đó mọi điểm (đỉnh) của các đường hiện chấm tròn; chạm vào một điểm để đặt
+  tên cho điểm đó (vd tên nhà ga). Tên điểm hiện làm nhãn ngay trên bản đồ và
+  được lưu/chia sẻ kèm theo đường.
+- **Kéo chỉnh điểm**: bấm nút ✥ để bật, rồi kéo các đỉnh của đường/hình để chỉnh
+  vị trí (chỉ di chuyển đỉnh có sẵn, không thêm đỉnh mới nên tên điểm không bị
+  lệch). Thay đổi tự lưu.
 - **Vị trí hiện tại**: nút định vị, ghim vị trí người dùng kèm vòng tròn độ
   chính xác (dùng Geolocation của trình duyệt, cần HTTPS).
 - **Điều khiển kiểu Google Maps**: cụm nút nổi ở góc phải-dưới gồm nút **lớp bản
