@@ -2,7 +2,9 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- maximum-scale + user-scalable=no: chặn trình duyệt tự phóng to CẢ TRANG
+       khi double-tap / pinch (zoom bản đồ vẫn chạy qua nút +/- và pinch trên map) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
   <!-- ===================== SEO ===================== -->
   <title>Hỗ Trợ Bản Đồ — Vẽ thửa đất từ tọa độ VN2000 / Lat-Lng | Miễn phí</title>
@@ -68,6 +70,17 @@
           </svg>
         </button>
       </h1>
+
+      <!-- ============ TÌM ĐỊA CHỈ ============ -->
+      <section class="panel">
+        <h2>🔍 Tìm địa chỉ</h2>
+        <p class="hint">Nhập địa chỉ, tên đường, phường/xã... rồi bấm tìm (hoặc Enter).</p>
+        <div class="row">
+          <input id="search-input" type="text" placeholder="Vd: 1 Lê Duẩn, Quận 1, TP.HCM" autocomplete="off" />
+          <button id="search-btn" class="primary" style="flex:0 0 auto;width:auto;">Tìm</button>
+        </div>
+        <ul id="search-results"></ul>
+      </section>
 
       <!-- ============ NHẬP VN2000 ============ -->
       <section class="panel">

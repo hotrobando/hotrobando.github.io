@@ -19,6 +19,8 @@ html, body {
   height: 100%;
   font-family: "Segoe UI", Roboto, system-ui, sans-serif;
   color: var(--text);
+  /* chặn double-tap-zoom + độ trễ 300ms của trình duyệt trên phần giao diện */
+  touch-action: manipulation;
 }
 
 #app {
@@ -109,6 +111,7 @@ html, body {
   flex: 1 1 auto;
   height: 100%;
   position: relative;
+  touch-action: none; /* để OpenLayers tự xử lý cử chỉ, chặn double-tap zoom của trình duyệt */
 }
 
 #draw-toolbar {
@@ -649,3 +652,32 @@ button.active { background: var(--accent); border-color: var(--accent); }
   color: var(--text);
 }
 .modal-close:hover { background: var(--hover); }
+
+/* =========================================================================
+ * KẾT QUẢ TÌM ĐỊA CHỈ
+ * ========================================================================= */
+#search-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+#search-results li {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  background: var(--input-bg);
+}
+#search-results li:hover { background: var(--hover); border-color: var(--accent); }
+#search-results li .sr-main { font-weight: 600; }
+#search-results li .sr-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+#search-results li.sr-empty {
+  cursor: default;
+  background: transparent;
+  color: var(--muted);
+  text-align: center;
+}
+#search-results li.sr-empty:hover { border-color: var(--border); background: transparent; }

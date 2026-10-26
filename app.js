@@ -147,12 +147,44 @@
     // Bỏ nút zoom mặc định (góc trái-trên); ta tự đặt cụm điều khiển
     // kiểu Google Maps ở góc phải-dưới. Giữ attribution.
     controls: ol.control.defaults.defaults({ zoom: false }),
+    // Bỏ zoom khi bấm đúp (double-click / double-tap) cho đỡ zoom ngoài ý muốn
+    // trên mobile. Vẫn còn nút +/-, cuộn chuột và pinch để zoom.
+    interactions: ol.interaction.defaults.defaults({ doubleClickZoom: false }),
     layers: [baseLayers.simple, baseLayers.satellite, vectorLayer],
     view: new ol.View({
-      center: ol.proj.fromLonLat([105.85, 21.02]), // Hà Nội
+      center: ol.proj.fromLonLat([105.85, 21.02]), // Hà Nội (mặc định khi chưa có gì đã lưu)
       zoom: 13
     })
   });
+
+  /* ---- Nhớ khung nhìn (center + zoom) để mở lại đúng chỗ ----
+   * Dù không lấy được vị trí, bản đồ vẫn mở đúng nơi bạn xem lần trước,
+   * không bị kéo về Hà Nội.
+   */
+  var VIEW_KEY = 'mymap.view.v1';
+  var view = map.getView();
+
+  function saveView() {
+    try {
+      var c = ol.proj.toLonLat(view.getCenter());
+      localStorage.setItem(VIEW_KEY, JSON.stringify({
+        lon: c[0], lat: c[1], zoom: view.getZoom()
+      }));
+    } catch (e) { /* bỏ qua */ }
+  }
+  function restoreView() {
+    var raw = localStorage.getItem(VIEW_KEY);
+    if (!raw) return false;
+    try {
+      var v = JSON.parse(raw);
+      if (typeof v.lon !== 'number' || typeof v.lat !== 'number') return false;
+      view.setCenter(ol.proj.fromLonLat([v.lon, v.lat]));
+      if (typeof v.zoom === 'number') view.setZoom(v.zoom);
+      return true;
+    } catch (e) { return false; }
+  }
+  // Lưu lại khung nhìn sau mỗi lần di chuyển/zoom (kể cả bằng nút, chuột, pinch).
+  map.on('moveend', saveView);
 
   // Chọn nền bản đồ, nhớ lựa chọn trong localStorage.
   var BASEMAP_KEY = 'mymap.basemap.v1';
@@ -1014,8 +1046,9 @@
    * ------------------------------------------------------------------ */
 
   var locateBtn = document.getElementById('locate-btn');
+  var LASTPOS_KEY = 'mymap.lastpos.v1';
 
-  // Layer riêng cho ghim vị trí người dùng (không trộn với các thửa đã lưu).
+  // ---- Ghim vị trí HIỆN TẠI (xanh) ----
   var positionFeature = new ol.Feature();
   positionFeature.setStyle(new ol.style.Style({
     image: new ol.style.Circle({
@@ -1029,11 +1062,55 @@
     fill: new ol.style.Fill({ color: 'rgba(31, 191, 117, 0.12)' }),
     stroke: new ol.style.Stroke({ color: 'rgba(31, 191, 117, 0.4)', width: 1 })
   }));
+
+  // ---- Ghim vị trí TRƯỚC ĐÓ (xám, có nhãn) ----
+  var lastPosFeature = new ol.Feature();
+  function lastPosStyle() {
+    return new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 6,
+        fill: new ol.style.Fill({ color: '#8a8f93' }),
+        stroke: new ol.style.Stroke({ color: '#ffffff', width: 2 })
+      }),
+      text: new ol.style.Text({
+        text: 'Vị trí trước đó',
+        offsetY: -16,
+        font: '11px "Segoe UI", sans-serif',
+        fill: new ol.style.Fill({ color: '#5b6560' }),
+        stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 })
+      })
+    });
+  }
+  lastPosFeature.setStyle(lastPosStyle());
+
   var positionLayer = new ol.layer.Vector({
-    source: new ol.source.Vector({ features: [accuracyFeature, positionFeature] }),
+    source: new ol.source.Vector({ features: [lastPosFeature, accuracyFeature, positionFeature] }),
     zIndex: 10
   });
   map.addLayer(positionLayer);
+
+  function saveLastPos(lon, lat, acc) {
+    try {
+      localStorage.setItem(LASTPOS_KEY, JSON.stringify({ lon: lon, lat: lat, acc: acc, t: Date.now() }));
+    } catch (e) { /* bỏ qua nếu storage đầy */ }
+  }
+
+  // Khôi phục vị trí đã lưu khi mở lại trang -> hiện ghim xám sẵn.
+  // moveView = true thì mới dời bản đồ tới vị trí cũ. Luôn hiện ghim xám.
+  function restoreLastPos(moveView) {
+    var raw = localStorage.getItem(LASTPOS_KEY);
+    if (!raw) return;
+    try {
+      var p = JSON.parse(raw);
+      if (typeof p.lon !== 'number' || typeof p.lat !== 'number') return;
+      var center = ol.proj.fromLonLat([p.lon, p.lat]);
+      lastPosFeature.setGeometry(new ol.geom.Point(center));
+      if (moveView) {
+        map.getView().setCenter(center);
+        map.getView().setZoom(16);
+      }
+    } catch (e) { /* dữ liệu hỏng -> bỏ qua */ }
+  }
 
   locateBtn.addEventListener('click', function () {
     if (!navigator.geolocation) {
@@ -1056,6 +1133,9 @@
         var center = ol.proj.fromLonLat([lon, lat]);
 
         positionFeature.setGeometry(new ol.geom.Point(center));
+        // Có vị trí hiện tại rồi thì ẩn ghim "trước đó" cho đỡ rối.
+        lastPosFeature.setGeometry(undefined);
+
         if (acc > 0) {
           // vòng tròn thể hiện độ chính xác (bán kính = accuracy mét),
           // vẽ trên mặt cầu rồi chiếu sang hệ hiển thị.
@@ -1067,6 +1147,7 @@
         }
 
         map.getView().animate({ center: center, zoom: 17, duration: 500 });
+        saveLastPos(lon, lat, acc); // nhớ cho lần mở sau
         toast('Đã về vị trí hiện tại (±' + Math.round(acc) + ' m).');
       },
       function (err) {
@@ -1089,6 +1170,126 @@
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
+
+  /* ------------------------------------------------------------------ *
+   * 8b2. TÌM ĐỊA CHỈ (geocoding qua Nominatim / OpenStreetMap)
+   *
+   * Miễn phí, không cần API key. Tôn trọng giới hạn: không gọi dồn dập,
+   * chỉ gọi khi người dùng bấm Tìm / nhấn Enter.
+   * ------------------------------------------------------------------ */
+
+  var searchInput = document.getElementById('search-input');
+  var searchBtn = document.getElementById('search-btn');
+  var searchResults = document.getElementById('search-results');
+
+  // Ghim kết quả tìm kiếm (màu tím, tạm thời - không lưu localStorage).
+  var searchFeature = new ol.Feature();
+  function searchPinStyle(label) {
+    return new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({ color: '#7c3aed' }),
+        stroke: new ol.style.Stroke({ color: '#ffffff', width: 2.5 })
+      }),
+      text: new ol.style.Text({
+        text: label || '',
+        offsetY: -18,
+        font: 'bold 12px "Segoe UI", sans-serif',
+        fill: new ol.style.Fill({ color: '#5b21b6' }),
+        stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 }),
+        overflow: true
+      })
+    });
+  }
+  var searchLayer = new ol.layer.Vector({
+    source: new ol.source.Vector({ features: [searchFeature] }),
+    zIndex: 11
+  });
+  map.addLayer(searchLayer);
+
+  function renderSearchMessage(msg) {
+    searchResults.innerHTML = '';
+    var li = document.createElement('li');
+    li.className = 'sr-empty';
+    li.textContent = msg;
+    searchResults.appendChild(li);
+  }
+
+  function gotoResult(item) {
+    var lon = parseFloat(item.lon);
+    var lat = parseFloat(item.lat);
+    if (isNaN(lon) || isNaN(lat)) return;
+    var center = ol.proj.fromLonLat([lon, lat]);
+    // nhãn ngắn gọn cho ghim
+    var shortName = (item.display_name || '').split(',')[0];
+    searchFeature.setGeometry(new ol.geom.Point(center));
+    searchFeature.setStyle(searchPinStyle(shortName));
+    map.getView().animate({ center: center, zoom: 17, duration: 500 });
+  }
+
+  function renderResults(list) {
+    searchResults.innerHTML = '';
+    if (!list.length) {
+      renderSearchMessage('Không tìm thấy địa chỉ phù hợp.');
+      return;
+    }
+    list.forEach(function (item) {
+      var li = document.createElement('li');
+      var parts = (item.display_name || '').split(',');
+      var main = document.createElement('div');
+      main.className = 'sr-main';
+      main.textContent = parts.shift().trim();
+      var sub = document.createElement('div');
+      sub.className = 'sr-sub';
+      sub.textContent = parts.join(',').trim();
+      li.appendChild(main);
+      if (sub.textContent) li.appendChild(sub);
+      li.addEventListener('click', function () { gotoResult(item); });
+      searchResults.appendChild(li);
+    });
+  }
+
+  var searchBusy = false;
+  function doSearch() {
+    var q = (searchInput.value || '').trim();
+    if (!q) { renderSearchMessage('Nhập địa chỉ để tìm.'); return; }
+    if (searchBusy) return;
+    searchBusy = true;
+    renderSearchMessage('Đang tìm...');
+
+    // Ưu tiên kết quả ở Việt Nam; nếu rỗng thì tìm lại toàn cầu.
+    var base = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=0&limit=6&accept-language=vi';
+    function query(url, thenFallback) {
+      fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          if ((!data || !data.length) && thenFallback) {
+            thenFallback();
+            return;
+          }
+          searchBusy = false;
+          renderResults(data || []);
+        })
+        .catch(function () {
+          searchBusy = false;
+          renderSearchMessage('Lỗi kết nối khi tìm địa chỉ. Thử lại sau.');
+        });
+    }
+    var qEnc = encodeURIComponent(q);
+    query(base + '&countrycodes=vn&q=' + qEnc, function () {
+      query(base + '&q=' + qEnc, null); // fallback toàn cầu
+    });
+  }
+
+  if (searchBtn) searchBtn.addEventListener('click', doSearch);
+  if (searchInput) {
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+    });
+  }
 
   /* ------------------------------------------------------------------ *
    * 8c. MODAL HƯỚNG DẪN VN2000
@@ -1211,7 +1412,13 @@
 
   registerVN2000(parseFloat(meridianInput.value), parseInt(zoneSelect.value, 10));
   loadFromStorage();
-  importFromShareParam(); // nếu mở từ link chia sẻ, hỏi để nhập thêm
+
+  // Khôi phục khung nhìn đã lưu. Nếu có thì không cần dời theo vị trí cũ nữa;
+  // nếu chưa có khung nhìn lưu thì dời tới vị trí định vị lần trước (nếu có).
+  var hadSavedView = restoreView();
+  restoreLastPos(!hadSavedView); // luôn hiện ghim xám; chỉ dời map khi chưa có view lưu
+
+  importFromShareParam(); // nếu mở từ link chia sẻ, hỏi để nhập thêm (ưu tiên khung nhìn này)
 
   // Năm bản quyền ở footer luôn cập nhật.
   var yearEl = document.getElementById('footer-year');

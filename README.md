@@ -9,6 +9,11 @@ Chạy hoàn toàn phía client, không cần server, deploy thẳng lên **GitH
 
 ## Tính năng
 
+- **Tìm địa chỉ**: ô tìm kiếm trong sidebar, dùng Nominatim (OpenStreetMap) —
+  miễn phí, không cần API key. Ưu tiên kết quả ở Việt Nam, bấm kết quả để bay
+  tới và đặt ghim (màu tím). Chỉ gọi khi bấm Tìm / Enter để tôn trọng giới hạn
+  của Nominatim.
+
 - **Nhập VN2000**: dán nhiều điểm `X Y` như trên sổ đỏ, chọn tỉnh (tự điền kinh
   tuyến trục) và múi chiếu (3° / 6°), tự chuyển sang Lat/Lng và vẽ.
 - **Hướng dẫn VN2000**: nút `?` mở bảng giải thích kinh tuyến trục / múi chiếu
