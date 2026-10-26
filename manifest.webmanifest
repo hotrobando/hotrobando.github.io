@@ -1,0 +1,18 @@
+{
+  "name": "Hỗ Trợ Bản Đồ",
+  "short_name": "Bản Đồ",
+  "description": "Vẽ thửa đất từ tọa độ VN2000 / Lat-Lng, tự vẽ, đo đạc, tìm địa chỉ và lưu ngay trên trình duyệt.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f3d35",
+  "theme_color": "#1fbf75",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

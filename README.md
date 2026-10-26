@@ -104,7 +104,16 @@ chia sẻ trên Facebook/Zalo có hình xem trước.
 ## Cấu trúc
 
 ```
-index.html   — giao diện
-style.css    — giao diện
-app.js       — toàn bộ logic (bản đồ, chuyển tọa độ, vẽ, lưu trữ)
+index.html            — giao diện
+style.css             — giao diện
+app.js                — toàn bộ logic (bản đồ, chuyển tọa độ, vẽ, lưu trữ)
+favicon.svg           — icon vector (ghim bản đồ)
+favicon-32.png        — favicon PNG
+apple-touch-icon.png  — icon khi "Thêm vào màn hình chính" trên iOS (180×180)
+icon-192/512.png      — icon PWA
+manifest.webmanifest  — khai báo PWA (tên, màu, icon)
 ```
+
+> Icon là hình ghim bản đồ gradient xanh lá trên nền xanh rêu. Nếu muốn đổi,
+> sửa `favicon.svg` rồi render lại các PNG (dùng `sharp` hoặc công cụ bất kỳ)
+> với các kích thước 32/180/192/512.

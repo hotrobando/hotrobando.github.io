@@ -6,6 +6,16 @@
        khi double-tap / pinch (zoom bản đồ vẫn chạy qua nút +/- và pinch trên map) -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
+  <!-- ===================== ICON / PWA ===================== -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#1fbf75" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bản Đồ" />
+
   <!-- ===================== SEO ===================== -->
   <title>Hỗ Trợ Bản Đồ — Vẽ thửa đất từ tọa độ VN2000 / Lat-Lng | Miễn phí</title>
   <meta name="description" content="Hỗ Trợ Bản Đồ: công cụ miễn phí nhập tọa độ VN2000 trên sổ đỏ (hoặc Lat/Lng) để vẽ ranh giới thửa đất lên bản đồ. Tự vẽ polygon, hình chữ nhật, đường đo; đặt tên, lưu và chia sẻ thửa ngay trên trình duyệt." />
@@ -22,11 +32,15 @@
   <meta property="og:description" content="Nhập tọa độ VN2000 trên sổ đỏ để vẽ ranh giới thửa đất lên bản đồ. Miễn phí, chạy ngay trên trình duyệt." />
   <meta property="og:url" content="https://hotrobando.github.io/" />
   <meta property="og:image" content="https://hotrobando.github.io/preview.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Hỗ Trợ Bản Đồ — vẽ và chia sẻ thửa đất" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Hỗ Trợ Bản Đồ — Vẽ thửa đất từ tọa độ VN2000 / Lat-Lng" />
   <meta name="twitter:description" content="Công cụ miễn phí nhập tọa độ VN2000 / Lat-Lng, vẽ ranh giới thửa đất lên bản đồ." />
+  <meta name="twitter:image" content="https://hotrobando.github.io/preview.png" />
 
   <!-- Dữ liệu có cấu trúc giúp Google hiểu trang (JSON-LD) -->
   <script type="application/ld+json">
@@ -137,12 +151,15 @@
           <button id="export-geojson" class="ghost">⬇ GeoJSON</button>
         </div>
         <div class="row">
+          <button id="import-btn" class="ghost">📥 Nhập từ link/mã</button>
           <button id="clear-all" class="ghost danger">🗑 Xóa hết</button>
         </div>
         <p class="hint">
           "Chia sẻ" tạo link chứa <b>tất cả</b> thửa; hoặc bấm 🔗 ở từng dòng
-          để chia sẻ <b>riêng một thửa</b>. Người nhận mở link sẽ được hỏi, và
-          chỉ những thửa <b>chưa có</b> trên máy họ mới được thêm vào.
+          để chia sẻ <b>riêng một thửa</b>. Chỉ những thửa <b>chưa có</b> trên máy
+          người nhận mới được thêm vào.
+          <br />Nhận được link/mã từ người khác? Bấm <b>Nhập từ link/mã</b> rồi
+          dán vào — dùng được cả khi mở app từ màn hình chính (iOS).
         </p>
         <ul id="saved-list"></ul>
       </section>

@@ -939,13 +939,20 @@
     }
     var okMsg = 'Đã sao chép link chia sẻ' + (labelForToast ? ' ' + labelForToast : '') + '.';
     function fallbackCopy() { window.prompt('Sao chép đường link chia sẻ:', url); }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(
-        function () { toast(okMsg); },
-        fallbackCopy
-      );
+    function copyToClipboard() {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { toast(okMsg); }, fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+    }
+    // Trên mobile (đặc biệt iOS): ưu tiên hộp thoại chia sẻ hệ thống để gửi
+    // thẳng qua Zalo/Messages. Nếu không hỗ trợ thì copy clipboard.
+    if (navigator.share) {
+      navigator.share({ title: 'Hỗ Trợ Bản Đồ', text: 'Thửa đất chia sẻ', url: url })
+        .catch(function () { copyToClipboard(); });
     } else {
-      fallbackCopy();
+      copyToClipboard();
     }
   }
 
@@ -972,14 +979,21 @@
     return name + '|' + (g.type || '') + '|' + JSON.stringify(g.coordinates || []);
   }
 
-  // Nhập các thửa từ param chia sẻ (gọi khi khởi động).
-  // Chỉ APPEND những thửa chưa có sẵn (so khớp bằng chữ ký).
-  function importFromShareParam() {
-    var params = new URLSearchParams(location.search);
-    var data = params.get(SHARE_PARAM);
-    if (!data) return;
+  // Tách mã chia sẻ (base64url) từ chuỗi người dùng dán vào: chấp nhận cả
+  // link đầy đủ (https://...?d=XXXX) lẫn chỉ mã XXXX.
+  function extractShareData(text) {
+    if (!text) return null;
+    text = text.trim();
+    // thử phân tích như một URL để lấy param ?d=
+    var m = text.match(/[?&]d=([^&#\s]+)/);
+    if (m) return decodeURIComponent(m[1]);
+    // không có ?d= -> coi như người dùng dán thẳng mã base64url
+    return text.replace(/\s+/g, '');
+  }
 
-    var cleanUrl = location.origin + location.pathname + location.hash;
+  // Lõi import dùng chung: nhận chuỗi mã base64url, append các thửa chưa có.
+  // Trả về true nếu xử lý được (dù có thêm hay không), false nếu dữ liệu hỏng.
+  function importFromData(data) {
     try {
       var json = b64urlToUtf8(data);
       var fc = JSON.parse(json);
@@ -989,7 +1003,6 @@
       });
       if (!incoming.length) throw new Error('rỗng');
 
-      // Tập chữ ký các thửa đang có để loại trùng.
       var existing = {};
       vectorSource.getFeatures().forEach(function (f) {
         existing[featureSignature(f)] = true;
@@ -1002,17 +1015,17 @@
         if (existing[sig]) {
           duplicates++;
         } else {
-          existing[sig] = true; // tránh trùng trong chính link
+          existing[sig] = true;
           toAdd.push(f);
         }
       });
 
       if (!toAdd.length) {
-        toast('Các thửa trong link đã có sẵn trên máy bạn.');
-        return;
+        toast('Các thửa được chia sẻ đã có sẵn trên máy bạn.');
+        return true;
       }
 
-      var msg = 'Đường link này chứa ' + incoming.length + ' thửa'
+      var msg = 'Dữ liệu chứa ' + incoming.length + ' thửa'
         + (duplicates ? ' (' + duplicates + ' đã có sẵn)' : '')
         + '. Thêm ' + toAdd.length + ' thửa mới vào máy của bạn?';
       if (confirm(msg)) {
@@ -1021,7 +1034,6 @@
         });
         vectorSource.addFeatures(toAdd);
         persistAll();
-        // phóng tới các thửa vừa thêm
         var ext = ol.extent.createEmpty();
         toAdd.forEach(function (f) {
           ol.extent.extend(ext, f.getGeometry().getExtent());
@@ -1029,12 +1041,36 @@
         map.getView().fit(ext, { padding: [60, 60, 60, 60], maxZoom: 19, duration: 500 });
         toast('Đã thêm ' + toAdd.length + ' thửa được chia sẻ.');
       }
+      return true;
     } catch (e) {
-      toast('Link chia sẻ không hợp lệ hoặc bị hỏng.', true);
-    } finally {
-      // Dọn param khỏi thanh địa chỉ dù nhận hay không.
-      window.history.replaceState({}, document.title, cleanUrl);
+      toast('Dữ liệu chia sẻ không hợp lệ hoặc bị hỏng.', true);
+      return false;
     }
+  }
+
+  // Khi mở trực tiếp bằng link có ?d= (hoạt động trên trình duyệt thường).
+  function importFromShareParam() {
+    var params = new URLSearchParams(location.search);
+    var data = params.get(SHARE_PARAM);
+    if (!data) return;
+    var cleanUrl = location.origin + location.pathname + location.hash;
+    importFromData(data);
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  // Nhập thủ công: người dùng dán link/mã (cần cho app cài trên màn hình chính
+  // iOS, nơi link chia sẻ mở ở Safari chứ không vào app).
+  var importBtn = document.getElementById('import-btn');
+  if (importBtn) {
+    importBtn.addEventListener('click', function () {
+      var text = window.prompt(
+        'Dán LINK hoặc MÃ chia sẻ bạn nhận được vào đây:'
+      );
+      if (text == null) return; // bấm hủy
+      var data = extractShareData(text);
+      if (!data) { toast('Chưa có dữ liệu để nhập.', true); return; }
+      importFromData(data);
+    });
   }
 
   /* ------------------------------------------------------------------ *
