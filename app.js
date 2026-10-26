@@ -144,6 +144,9 @@
 
   var map = new ol.Map({
     target: 'map',
+    // Bỏ nút zoom mặc định (góc trái-trên); ta tự đặt cụm điều khiển
+    // kiểu Google Maps ở góc phải-dưới. Giữ attribution.
+    controls: ol.control.defaults.defaults({ zoom: false }),
     layers: [baseLayers.simple, baseLayers.satellite, vectorLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([105.85, 21.02]), // Hà Nội
@@ -151,7 +154,7 @@
     })
   });
 
-  // Chọn nền bản đồ qua dropdown, nhớ lựa chọn trong localStorage.
+  // Chọn nền bản đồ, nhớ lựa chọn trong localStorage.
   var BASEMAP_KEY = 'mymap.basemap.v1';
   function setBasemap(key) {
     if (!baseLayers[key]) key = 'simple';
@@ -159,17 +162,54 @@
       baseLayers[k].setVisible(k === key);
     });
     localStorage.setItem(BASEMAP_KEY, key);
+    // đánh dấu lựa chọn đang chọn trong menu layers
+    var opts = document.querySelectorAll('#layers-menu .layer-opt');
+    for (var i = 0; i < opts.length; i++) {
+      opts[i].classList.toggle('active', opts[i].getAttribute('data-basemap') === key);
+    }
   }
   var savedBasemap = localStorage.getItem(BASEMAP_KEY) || 'simple';
-  setBasemap(savedBasemap);
 
-  var basemapSelect = document.getElementById('basemap-select');
-  if (basemapSelect) {
-    basemapSelect.value = savedBasemap;
-    basemapSelect.addEventListener('change', function () {
-      setBasemap(basemapSelect.value);
+  /* ---- Cụm điều khiển góc phải-dưới (layers / định vị / zoom) ---- */
+  var layersBtn = document.getElementById('layers-btn');
+  var layersMenu = document.getElementById('layers-menu');
+  if (layersBtn && layersMenu) {
+    layersBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = layersMenu.hidden;
+      layersMenu.hidden = !open;
+      layersBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      layersBtn.classList.toggle('active', open);
+    });
+    layersMenu.querySelectorAll('.layer-opt').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setBasemap(btn.getAttribute('data-basemap'));
+        layersMenu.hidden = true;
+        layersBtn.setAttribute('aria-expanded', 'false');
+        layersBtn.classList.remove('active');
+      });
+    });
+    // bấm ra ngoài -> đóng menu
+    document.addEventListener('click', function (e) {
+      if (!layersMenu.hidden && !document.getElementById('layers-wrap').contains(e.target)) {
+        layersMenu.hidden = true;
+        layersBtn.setAttribute('aria-expanded', 'false');
+        layersBtn.classList.remove('active');
+      }
     });
   }
+  setBasemap(savedBasemap);
+
+  // Zoom +/- với hiệu ứng mượt.
+  function zoomBy(delta) {
+    var view = map.getView();
+    var z = view.getZoom();
+    view.animate({ zoom: Math.round(z) + delta, duration: 200 });
+  }
+  var zi = document.getElementById('zoom-in');
+  var zo = document.getElementById('zoom-out');
+  if (zi) zi.addEventListener('click', function () { zoomBy(1); });
+  if (zo) zo.addEventListener('click', function () { zoomBy(-1); });
 
   /* ---- Định dạng số đo ---- */
   function formatLength(m) {
@@ -407,7 +447,9 @@
     toastEl.textContent = msg;
     toastEl.className = 'show' + (isError ? ' error' : '');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { toastEl.className = ''; }, 2800);
+    // thông điệp dài (vd hướng dẫn cấp quyền) hiển thị lâu hơn
+    var dur = Math.min(9000, Math.max(2800, msg.length * 70));
+    toastTimer = setTimeout(function () { toastEl.className = ''; }, dur);
   }
 
   // Tách text nhiều dòng thành mảng cặp số [a, b].
@@ -749,6 +791,18 @@
 
   document.getElementById('draw-cancel').addEventListener('click', stopDrawing);
 
+  // Nút bung/thu nhóm công cụ vẽ (chủ yếu cho mobile, nơi nhóm bị ẩn).
+  var toolbarEl = document.getElementById('draw-toolbar');
+  var toolsToggleBtn = document.getElementById('draw-tools-toggle');
+  if (toolsToggleBtn && toolbarEl) {
+    toolsToggleBtn.addEventListener('click', function () {
+      var open = toolbarEl.classList.toggle('tools-open');
+      toolsToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toolsToggleBtn.classList.toggle('active', open);
+      if (!open) stopDrawing(); // thu nhóm lại thì dừng vẽ nếu đang vẽ
+    });
+  }
+
   /* ------------------------------------------------------------------ *
    * 8. XUẤT / XÓA
    * ------------------------------------------------------------------ */
@@ -986,6 +1040,12 @@
       toast('Trình duyệt không hỗ trợ định vị.', true);
       return;
     }
+    // Safari/iOS chỉ cho định vị trên ngữ cảnh an toàn (HTTPS hoặc localhost).
+    // Nếu mở qua http:// hoặc IP, trình duyệt từ chối ngay mà không hỏi.
+    if (typeof isSecureContext !== 'undefined' && !isSecureContext) {
+      toast('Định vị cần HTTPS. Hãy mở trang qua https:// (ví dụ bản trên GitHub Pages), không dùng http.', true);
+      return;
+    }
     locateBtn.classList.add('loading');
     navigator.geolocation.getCurrentPosition(
       function (pos) {
@@ -1011,10 +1071,19 @@
       },
       function (err) {
         locateBtn.classList.remove('loading');
+        var isApple = /iP(hone|ad|od)|Safari/.test(navigator.userAgent) &&
+                      !/Chrome|CriOS|Android/.test(navigator.userAgent);
         var msg = 'Không lấy được vị trí.';
-        if (err.code === err.PERMISSION_DENIED) msg = 'Bạn đã từ chối quyền truy cập vị trí.';
-        else if (err.code === err.POSITION_UNAVAILABLE) msg = 'Vị trí không khả dụng.';
-        else if (err.code === err.TIMEOUT) msg = 'Lấy vị trí quá lâu, thử lại.';
+        if (err.code === err.PERMISSION_DENIED) {
+          // Safari thường báo "denied" ngay cả khi chưa hỏi, do quyền bị tắt.
+          msg = isApple
+            ? 'Vị trí bị chặn. Trên iPhone: bật Cài đặt → Quyền riêng tư → Dịch vụ định vị → Safari, và Cài đặt → Safari → Vị trí = Hỏi/Cho phép, rồi thử lại.'
+            : 'Quyền vị trí bị từ chối. Hãy cho phép trong phần quyền của trang (biểu tượng khóa trên thanh địa chỉ) rồi thử lại.';
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          msg = 'Vị trí không khả dụng. Kiểm tra GPS/định vị của thiết bị.';
+        } else if (err.code === err.TIMEOUT) {
+          msg = 'Lấy vị trí quá lâu. Thử lại ở nơi thoáng hơn.';
+        }
         toast(msg, true);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }

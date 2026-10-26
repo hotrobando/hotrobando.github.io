@@ -126,6 +126,126 @@ html, body {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
+/* Nhóm nút vẽ + nút bung. Trên desktop: nhóm hiện, nút bung ẩn. */
+#draw-tools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#draw-tools-toggle { display: none; }
+
+/* ===== Cụm điều khiển góc phải-dưới (kiểu Google Maps) ===== */
+#map-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 24px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.ctrl-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  color: #3a4a44;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  font-size: 22px;
+  line-height: 1;
+}
+.ctrl-btn:hover { background: var(--hover); }
+.ctrl-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+#locate-btn.loading { opacity: 0.6; }
+
+/* cụm zoom: 2 nút dính liền */
+#zoom-ctrl {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+#zoom-ctrl .ctrl-btn {
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: none;
+}
+#zoom-ctrl .ctrl-btn:last-child { border-bottom: 1px solid var(--border); }
+
+/* menu chọn lớp bản đồ */
+#layers-wrap { position: relative; }
+#layers-menu {
+  position: absolute;
+  right: 0;
+  bottom: 50px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  padding: 6px;
+  min-width: 150px;
+}
+#layers-menu[hidden] { display: none; }
+.layer-opt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+}
+.layer-opt:hover { background: var(--hover); }
+.layer-opt.active {
+  background: rgba(31, 191, 117, 0.16); /* nền xanh nhạt */
+  border-color: var(--accent);
+  color: var(--text);                   /* chữ đậm, rõ trên nền sáng */
+  font-weight: 600;
+}
+/* dấu tick cho lựa chọn đang chọn */
+.layer-opt.active::after {
+  content: "✓";
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 700;
+}
+.layer-sw {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  flex: none;
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+}
+.sw-simple {
+  background: linear-gradient(135deg, #e8efe9 0%, #cfe0d9 100%);
+}
+.sw-sat {
+  background: linear-gradient(135deg, #2f4a2a 0%, #5a7d3a 50%, #294b6e 100%);
+}
+
+/* Dời attribution của OpenLayers sang góc trái-dưới để không đè cụm điều khiển
+   (nằm ở phải-dưới). */
+.ol-attribution {
+  right: auto !important;
+  left: 0;
+  bottom: 0;
+}
+
 /* Tooltip số đo (khoảng cách / diện tích) khi rê chuột */
 #measure-tooltip {
   position: absolute;
@@ -416,8 +536,21 @@ button.active { background: var(--accent); border-color: var(--accent); }
   button { padding: 11px; }
   input, select, textarea { font-size: 16px; } /* tránh iOS tự zoom khi focus */
 
-  /* Thanh vẽ dịch xuống để không chạm nút toggle nếu màn hẹp */
-  #draw-toolbar { top: 10px; }
+  /* Toolbar dời về góc PHẢI-trên để không bị nút 3 gạch (góc trái) đè lên. */
+  #draw-toolbar {
+    top: 10px;
+    left: auto;
+    right: 10px;
+    transform: none;
+  }
+
+  /* Trên mobile: ẩn nhóm công cụ vẽ, chỉ hiện nút bung. */
+  #draw-tools-toggle { display: flex; }
+  #draw-tools { display: none; }
+  #draw-toolbar.tools-open #draw-tools { display: flex; }
+
+  /* Dải hướng dẫn vẽ cũng dời xuống chút cho thoáng */
+  #draw-hint { top: 62px; }
 }
 
 @media (max-width: 380px) {
@@ -433,21 +566,6 @@ button.active { background: var(--accent); border-color: var(--accent); }
   background: var(--border);
   margin: 2px 2px;
 }
-
-/* dropdown chọn nền bản đồ trong toolbar nổi */
-.tool-select {
-  width: auto;
-  margin: 0;
-  height: 34px;
-  padding: 0 8px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-.tool-select:hover { background: var(--hover); }
-.tool-select option { background: var(--panel); color: var(--text); }
 
 /* nút "?" cạnh tiêu đề */
 .help-btn {
@@ -470,9 +588,6 @@ button.active { background: var(--accent); border-color: var(--accent); }
   text-decoration: none;
 }
 #vn2000-help-link:hover { text-decoration: underline; }
-
-/* nút định vị đang chạy (đợi GPS) */
-#locate-btn.loading { opacity: 0.6; }
 
 /* =========================================================================
  * MODAL HƯỚNG DẪN

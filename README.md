@@ -28,8 +28,9 @@ Chạy hoàn toàn phía client, không cần server, deploy thẳng lên **GitH
     nhìn trên cả nền Đơn giản lẫn Vệ tinh.
 - **Vị trí hiện tại**: nút định vị, ghim vị trí người dùng kèm vòng tròn độ
   chính xác (dùng Geolocation của trình duyệt, cần HTTPS).
-- **Chọn nền bản đồ**: Đơn giản (OpenStreetMap) hoặc Vệ tinh (Esri World
-  Imagery). Cả hai miễn phí, không cần API key. Lựa chọn được ghi nhớ.
+- **Điều khiển kiểu Google Maps**: cụm nút nổi ở góc phải-dưới gồm nút **lớp bản
+  đồ** (icon layers, mở menu chọn Đơn giản / Vệ tinh có ô màu xem trước), nút
+  **định vị**, và cụm **zoom +/−**. Lựa chọn nền được ghi nhớ.
 - **Chia sẻ qua link**:
   - Nút "Chia sẻ" tạo link chứa **toàn bộ** thửa.
   - Bấm 🔗 ở từng dòng để chia sẻ **riêng một thửa**.
