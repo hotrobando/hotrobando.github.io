@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hotrobando.github.io/sitemap.xml
